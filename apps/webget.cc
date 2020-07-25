@@ -1,3 +1,4 @@
+#include "eventloop.hh"
 #include "socket.hh"
 #include "util.hh"
 
@@ -7,18 +8,27 @@
 using namespace std;
 
 void get_URL(const string &host, const string &path) {
-    // Your code here.
-
-    // You will need to connect to the "http" service on
-    // the computer whose name is in the "host" string,
-    // then request the URL path given in the "path" string.
+    // connect to the "http" service on the computer whose name is in 
+    // the "host" string, then request the URL path given in the "path" string.
+    TCPSocket socket = TCPSocket();
+    socket.connect(Address(host, "http"));
+    const std::string request = "GET " + path + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n";
+    socket.write(request);
+    socket.shutdown(SHUT_WR);
 
     // Then you'll need to print out everything the server sends back,
     // (not just one call to read() -- everything) until you reach
     // the "eof" (end of file).
+    cout << "wait for server responce.\n";
+    auto i = 0;
+    while (!socket.eof()) {
+        cout << socket.read();
+        i++;
+    }
+    socket.close();
 
     cerr << "Function called: get_URL(" << host << ", " << path << ").\n";
-    cerr << "Warning: get_URL() has not been implemented yet.\n";
+    cerr << "read " << i << " times.\n";
 }
 
 int main(int argc, char *argv[]) {

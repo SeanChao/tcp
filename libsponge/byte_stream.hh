@@ -9,13 +9,27 @@
 #include <utility>
 
 //! \brief An in-order byte stream.
-
 //! Bytes are written on the "input" side and read from the "output"
 //! side.  The byte stream is finite: the writer can end the input,
 //! and then no more bytes can be written.
 class ByteStream {
   private:
-    // Your code here -- add private members as necessary.
+    const size_t capacity;
+
+    // actual length of buffer
+    size_t buf_len;
+    // buffer is organized as a circular queue
+    std::string buffer;
+
+    // position of the header of buffer, content appears **after** start
+    size_t start;
+    // position of end of buffer
+    size_t end;
+
+    bool inputEndFlag;
+
+    size_t read_cnt;
+    size_t write_cnt;
 
     bool _error{};  //!< Flag indicating that the stream suffered an error.
 
@@ -53,11 +67,7 @@ class ByteStream {
 
     //! Read (i.e., copy and then pop) the next "len" bytes of the stream
     //! \returns a vector of bytes read
-    std::string read(const size_t len) {
-        const auto ret = peek_output(len);
-        pop_output(len);
-        return ret;
-    }
+    std::string read(const size_t len);
 
     //! \returns `true` if the stream input has ended
     bool input_ended() const;
