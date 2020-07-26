@@ -4,16 +4,29 @@
 #include "byte_stream.hh"
 
 #include <cstdint>
+#include <set>
 #include <string>
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
 //! possibly overlapping) into an in-order byte stream.
 class StreamReassembler {
   private:
-    // Your code here -- add private members as necessary.
+    struct segment {
+        std::string _data;
+        uint64_t _index;
+        bool _eof;
+        segment(std::string data, uint64_t index, bool eof) : _data(data), _index(index), _eof(eof) {}
+        bool operator<(const segment &seg) const { return this->_index < seg._index; }
+        uint64_t get_start() const { return _index; }
+        uint64_t get_end() const { return _index + _data.length(); }
+        uint64_t get_len() const { return _data.length(); }
+    };
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+    uint64_t _next_index;
+    std::multiset<segment> _unassembled_seg;
+    size_t _unassembled_bytes;
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -29,7 +42,7 @@ class StreamReassembler {
     //! will be disregarded.
     //!
     //! \param data the string being added
-    //! \param index the index of the first byte in `data`
+    //! \param index the index (place in sequence) of the first byte in `data`
     //! \param eof whether or not this segment ends with the end of the stream
     void push_substring(const std::string &data, const uint64_t index, const bool eof);
 
