@@ -9,6 +9,8 @@
 
 using namespace std;
 
+// TODO: refactor this lib with real `capacity` limit
+
 StreamReassembler::StreamReassembler(const size_t capacity)
     : _output(capacity), _capacity(capacity), _next_index(0), _unassembled_seg(), _unassembled_bytes(0) {}
 
@@ -49,12 +51,13 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         }
         if (s.get_start() <= this->_next_index) {
             size_t start_pos = _next_index - s.get_start();
-            _output.write(s._data.substr(start_pos));
+            size_t stream_remain_size = _output.remaining_capacity();
+            size_t written = _output.write(s._data.substr(start_pos, stream_remain_size));
             if (s._eof) {
                 _output.end_input();
             }
-            this->_next_index = s.get_end();
-            this->_unassembled_bytes -= s.get_len();
+            this->_next_index += written;
+            this->_unassembled_bytes -= written;
             it = _unassembled_seg.erase(it);
         } else
             it++;

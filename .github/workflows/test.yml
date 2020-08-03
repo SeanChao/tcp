@@ -1,0 +1,21 @@
+name: Tests
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: setup
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+    - name: make
+      run: make -j
+    - name: check
+      run: |
+        make check_lab0
+        make check_lab1
+        make check_lab2

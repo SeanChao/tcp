@@ -10,3 +10,5 @@ compile_commands.json
 .build
 *.out
 .vscode
+test.cc
+.idea
