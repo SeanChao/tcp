@@ -9,6 +9,23 @@
 #include <functional>
 #include <queue>
 
+class Timer {
+  public:
+    void start();
+    void stop();
+    void update(size_t ms_since_last_tick);
+    bool expire() const;
+    void double_rto();
+    void set_rto(uint64_t timeout);
+    void restart();
+    Timer(size_t timeout) : rto(timeout){};
+
+  private:
+    bool running = false;
+    size_t time = 0;
+    size_t rto;
+};
+
 //! \brief The "sender" part of a TCP implementation.
 
 //! Accepts a ByteStream, divides it up into segments and sends the
@@ -17,20 +34,45 @@
 //! segments if the retransmission timer expires.
 class TCPSender {
   private:
-    //! our initial sequence number, the number for our SYN.
+    // our initial sequence number, the number for our SYN.
     WrappingInt32 _isn;
 
-    //! outbound queue of segments that the TCPSender wants sent
+    // outbound queue of segments that the TCPSender wants sent
     std::queue<TCPSegment> _segments_out{};
+    std::queue<TCPSegment> _outstanding{};
 
-    //! retransmission timer for the connection
+    // retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
 
-    //! outgoing stream of bytes that have not yet been sent
+    // outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
-    //! the (absolute) sequence number for the next byte to be sent
+    // indicate whether the sender has send a SYN segment
+    bool syn{false};
+    bool fin{false};
+
+    // the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    // the receiver's window size
+    size_t _window_size;
+
+    // checkpoint for unwrap
+    uint64_t _checkpoint;
+
+    uint64_t _bytes_in_flight{0};
+
+    unsigned _consecutive_retransmit{0};
+
+    uint64_t cur_max_ackno{0};
+
+    // retransmission timer
+    Timer timer;
+
+    // Push a TCPSegment to output queue, properly handle the timer
+    void send_segment(TCPSegment &segment);
+
+    uint64_t _unwrap(WrappingInt32 n) const;
 
   public:
     //! Initialize a TCPSender

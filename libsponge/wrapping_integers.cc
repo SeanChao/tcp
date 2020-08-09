@@ -26,7 +26,7 @@ WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) { return WrappingInt32{isn + n
 //! has a different ISN.
 uint64_t unwrap(WrappingInt32 n, WrappingInt32 isn, uint64_t checkpoint) {
     WrappingInt32 wrapped_checkpoint = wrap(checkpoint, isn);
-    cout << wrapped_checkpoint << endl;
+    // cout << wrapped_checkpoint << endl;
     if (n.raw_value() > wrapped_checkpoint.raw_value()) {
         uint32_t diff = n.raw_value() - wrapped_checkpoint.raw_value();
         if (diff > (1u << 16)) {

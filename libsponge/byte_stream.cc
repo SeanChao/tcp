@@ -43,7 +43,7 @@ string ByteStream::peek_output(const size_t len) const {
     size_t pos = (start + 1) % buf_len;
     size_t cnt = 0;
     std::string peek = "";
-    while (pos != ((end + 1) % buf_len) && cnt <= len) {
+    while (pos != ((end + 1) % buf_len) && cnt < len) {
         peek.push_back(buffer[pos]);
         pos = (pos + 1) % buf_len;
         cnt++;

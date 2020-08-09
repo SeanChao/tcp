@@ -7,6 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: install dependencies
+      run: |
+        sudo apt -y install g++-9
     - name: setup
       run: |
         mkdir build
