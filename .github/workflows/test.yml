@@ -5,23 +5,28 @@ on: push
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      C: gcc-9
+      CXX: g++-9
     steps:
-    - uses: actions/checkout@v2
-    - name: install dependencies
-      run: |
-        sudo apt -y install g++-9 gcc-9
-        update-alternatives --set gcc "/usr/bin/gcc-9"
-        update-alternatives --set g++ "/usr/bin/g++-9"
-    - name: setup
-      run: |
-        mkdir build
-        cd build
-        cmake ..
-    - name: make
-      run: make -j
-    - name: check
-      run: |
-        make check_lab0
-        make check_lab1
-        make check_lab2
-        make check_lab3
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          sudo apt install -y g++-9 gcc-9
+          sudo apt install -y  doxygen libpcap-dev
+      - name: setup
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+      - name: make
+        run: |
+          cd build
+          make -j
+      - name: check
+        run: |
+          cd build
+          make check_lab0
+          make check_lab1
+          make check_lab2
+          make check_lab3
