@@ -24,6 +24,8 @@ ByteStream::ByteStream(const size_t cap)
     , write_cnt(0) {}
 
 size_t ByteStream::write(const string &data) {
+    if (error())
+        return 0;
     size_t count = 0;
     for (size_t i = 0; i < data.length(); i++) {
         if (((end + 1) % buf_len) == start) {
@@ -40,6 +42,9 @@ size_t ByteStream::write(const string &data) {
 
 //! \param[in] len bytes will be copied from the output side of the buffer
 string ByteStream::peek_output(const size_t len) const {
+    if (error() || eof()) {
+        return "";
+    }
     size_t pos = (start + 1) % buf_len;
     size_t cnt = 0;
     std::string peek = "";
@@ -62,9 +67,9 @@ void ByteStream::pop_output(const size_t len) {
 }
 
 std::string ByteStream::read(const size_t len) {
-    const auto ret = peek_output(len);
-    pop_output(len);
-    this->read_cnt += len;
+    auto ret = peek_output(len);
+    size_t read_len = ret.length();
+    pop_output(read_len);
     return ret;
 }
 
@@ -83,3 +88,9 @@ size_t ByteStream::bytes_written() const { return this->write_cnt; }
 size_t ByteStream::bytes_read() const { return this->read_cnt; }
 
 size_t ByteStream::remaining_capacity() const { return capacity - this->buffer_size(); }
+
+std::string ByteStream::summary() const {
+    return "end: " + to_string(input_ended()) + " err: " + to_string(error()) + " eof: " + to_string(eof()) +
+           " written: " + to_string(bytes_written()) + " read: " + to_string(bytes_read()) +
+           " empty: " + to_string(buffer_empty());
+}

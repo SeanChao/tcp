@@ -72,7 +72,7 @@ int main() {
                 sendoff += len;
             }
 
-            test_1.execute(ExpectData{}.with_data(d), "test 1 falied: got back the wrong data");
+            test_1.execute(ExpectData{}.with_data(d), "test 1 failed: got back the wrong data");
         }
     } catch (const exception &e) {
         cerr << e.what() << endl;

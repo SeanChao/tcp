@@ -20,6 +20,10 @@ class StreamReassembler {
         uint64_t get_start() const { return _index; }
         uint64_t get_end() const { return _index + _data.length(); }
         uint64_t get_len() const { return _data.length(); }
+        std::string summary() const {
+            return "[start: " + std::to_string(get_start()) + " end: " + std::to_string(get_end()) +
+                   " eof: " + std::to_string(_eof) + "]";
+        }
     };
 
     ByteStream _output;  //!< The reassembled in-order byte stream

@@ -5,6 +5,8 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <spdlog/spdlog.h>
+#include <sstream>
 
 // Dummy implementation of a TCP sender
 
@@ -30,42 +32,48 @@ void TCPSender::fill_window() {
     if (this->fin)
         return;
 
-    TCPSegment seg;
-    TCPHeader header;
+    size_t adjusted_win = (_window_size > 0 ? _window_size : 1);
+    size_t size_under_window = adjusted_win - bytes_in_flight();
+    bool keep = true;
+    while (keep && /*size_under_window > 0 &&*/ !_stream.error()) {
+        TCPSegment seg;
+        TCPHeader header;
 
-    size_t size_under_window = _window_size - bytes_in_flight();
-    size_t size = size_under_window < TCPConfig::MAX_PAYLOAD_SIZE ? size_under_window : TCPConfig::MAX_PAYLOAD_SIZE;
+        if (adjusted_win <= bytes_in_flight())
+            break;
+        size_under_window = adjusted_win - bytes_in_flight();
+        size_t size = size_under_window < TCPConfig::MAX_PAYLOAD_SIZE ? size_under_window : TCPConfig::MAX_PAYLOAD_SIZE;
+        if (_next_seqno == 0)
+            header.syn = true;
+        spdlog::warn(
+            "TX: fill_window input_end={} buf_size={} size={}", _stream.input_ended(), _stream.buffer_size(), size);
+        if (_stream.input_ended() && _stream.buffer_size() + header.syn + 1 <= size) {
+            header.fin = true;
+            this->fin = true;
+            keep = false;
+        }
+        size -= header.syn + header.fin;
 
-    if (_next_seqno == 0)
-        header.syn = true;
-    if (_stream.input_ended() && _stream.buffer_size() < size_under_window) {
-        header.fin = true;
-        this->fin = true;
+        std::string data = _stream.read(size);
+        Buffer buf(std::move(data));
+        seg.payload() = buf;
+
+        header.seqno = wrap(_next_seqno, _isn);
+        seg.header() = header;
+        _next_seqno += seg.length_in_sequence_space();
+        if (!header.syn && !header.fin && buf.size() == 0)
+            return;
+        send_segment(seg);
+        _outstanding.push(seg);
     }
-
-    if (size <= 0)
-        return;
-    std::string data = _stream.read(size);
-    Buffer buf(std::move(data));
-    seg.payload() = buf;
-
-    header.seqno = wrap(_next_seqno, _isn);
-    seg.header() = header;
-    _next_seqno += seg.length_in_sequence_space();
-    if (!header.syn && !header.fin && buf.size() == 0)
-        return;
-    send_segment(seg);
-    _outstanding.push(seg);
 }
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 //! \returns `false` if the ackno appears invalid (acknowledges something the TCPSender hasn't sent yet)
 bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    // if (this->fin)
-    // return true;
     uint64_t u_ackno = _unwrap(ackno);
-    cout << "Received: w-ackno: " << ackno << " u " << u_ackno << endl;
+    // spdlog::info("TX: <- 📦 " << u_ackno << "(" << ackno << ")" << endl);
     if (_next_seqno < u_ackno)
         return false;
     _window_size = window_size;
@@ -88,18 +96,22 @@ bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     // numbers in the segment).
     while (!_outstanding.empty()) {
         TCPSegment seg = _outstanding.front();
-        if (_unwrap(seg.header().seqno) <= u_ackno) {
+        if (_unwrap(seg.header().seqno) + seg.length_in_sequence_space() <= u_ackno) {
             _outstanding.pop();
-            cout << "bytes in flight " << _bytes_in_flight << " reduce by " << seg.length_in_sequence_space() << " "
-                 << seg.header().summary() << " " << seg.payload().copy() << endl;
+            // cout << "TX: bytes in flight " << _bytes_in_flight << " reduce by " << seg.length_in_sequence_space() <<
+            // " "
+            //  << seg.header().summary() << " " << seg.payload().copy().substr(0, 40) << endl;
             _bytes_in_flight -= seg.length_in_sequence_space();
         } else
             break;
     }
-    _next_seqno = _unwrap(ackno);
+    uint64_t new_next_seqno = _unwrap(ackno);
+    if (new_next_seqno > _next_seqno)
+        _next_seqno = new_next_seqno;
     // When all outstanding data has been acknowledged, turn off the retransmission timer.
     if (_outstanding.empty())
         timer.stop();
+    spdlog::info("TX: winsize->{} bytes_in_flight={}", _window_size, bytes_in_flight());
     return true;
 }
 
@@ -113,6 +125,7 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
         if (!_outstanding.empty()) {
             TCPSegment seg = _outstanding.front();
             _segments_out.push(seg);
+            // cout << "TX: -> 📦 " << seg.header().summary() << " (RETX)" << endl;
         }
         if (_window_size > 0) {
             _consecutive_retransmit++;
@@ -132,7 +145,10 @@ void TCPSender::send_segment(TCPSegment &segment) {
     _bytes_in_flight += segment.length_in_sequence_space();
     // update checkpoint
     this->_checkpoint = _unwrap(segment.header().seqno) + segment.length_in_sequence_space();
-    cout << "Sent a segment " << segment.header().summary() << " payload: " << segment.payload().copy() << endl;
+    stringstream ss;
+    ss << "TX: -> 📦 " << segment.header().summary() << " len: " << segment.length_in_sequence_space()
+       << " payload: " << segment.payload().copy().substr(0, 40) << endl;
+    spdlog::info(ss.str());
 }
 
 uint64_t TCPSender::_unwrap(WrappingInt32 n) const { return unwrap(n, _isn, _checkpoint); }
@@ -141,7 +157,9 @@ void TCPSender::send_empty_segment() {
     TCPSegment seg;
     seg.header().seqno = wrap(_next_seqno, _isn);
     _segments_out.push(seg);
-    cout << "send empty segment: " << seg.header().summary() << endl;
+    stringstream ss;
+    ss << "TX: -> empty 📦 " << seg.header().summary() << endl;
+    spdlog::info(ss.str());
 }
 
 void Timer::start() { running = true; }
@@ -160,3 +178,7 @@ void Timer::double_rto() { this->rto *= 2; }
 void Timer::set_rto(uint64_t timeout) { this->rto = timeout; }
 
 void Timer::restart() { this->time = 0; }
+
+void Timer::mark() { _mark = time; }
+
+size_t Timer::interval() const { return time - _mark; }

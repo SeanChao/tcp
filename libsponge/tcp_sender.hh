@@ -18,12 +18,17 @@ class Timer {
     void double_rto();
     void set_rto(uint64_t timeout);
     void restart();
+    void mark();
+    size_t interval() const;
+
+    Timer(){};
     Timer(size_t timeout) : rto(timeout){};
 
   private:
     bool running = false;
     size_t time = 0;
-    size_t rto;
+    size_t rto = 0;
+    size_t _mark = 0;
 };
 
 //! \brief The "sender" part of a TCP implementation.

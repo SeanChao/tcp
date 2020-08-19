@@ -1,10 +1,17 @@
 #ifndef SPONGE_LIBSPONGE_TCP_FACTORED_HH
 #define SPONGE_LIBSPONGE_TCP_FACTORED_HH
 
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/spdlog.h"
 #include "tcp_config.hh"
 #include "tcp_receiver.hh"
 #include "tcp_sender.hh"
 #include "tcp_state.hh"
+
+#include <optional>
+#include <string>
+
+std::string rand_string(const int len);
 
 //! \brief A complete endpoint of a TCP connection
 class TCPConnection {
@@ -16,10 +23,32 @@ class TCPConnection {
     //! outbound queue of segments that the TCPConnection wants sent
     std::queue<TCPSegment> _segments_out{};
 
+    bool _active{true};
+
     //! Should the TCPConnection stay active (and keep ACKing)
     //! for 10 * _cfg.rt_timeout milliseconds after both streams have ended,
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
+
+    // timer
+    Timer timer;
+
+    // connection state
+    enum State { HANDSHAKE, WAIT_HS, ONGOING, CLOSED };
+    State conn_state{State::HANDSHAKE};
+
+    bool state_connect{false};
+    bool listen_wait_syn{true};
+    bool fin_sent{false};
+    bool fin_acked{false};
+
+    void send_out();
+
+    // set error flag of inbound and outbound stream and set _active to false
+    void reset();
+    void send_rst(std::optional<WrappingInt32> seqno = {});
+
+    bool conn_end_detect();
 
   public:
     //! \name "Input" interface for the writer
@@ -81,7 +110,12 @@ class TCPConnection {
     //!@}
 
     //! Construct a new connection from a configuration
-    explicit TCPConnection(const TCPConfig &cfg) : _cfg{cfg} {}
+    explicit TCPConnection(const TCPConfig &cfg) : _cfg{cfg}, timer() {
+        timer.start();
+        spdlog::set_pattern("[%H:%M:%S %e][%L] %v");
+        spdlog::set_default_logger(spdlog::basic_logger_mt("logger" + rand_string(3), "/dev/null"));
+        spdlog::info("Connection created: rt_timeout={}", cfg.rt_timeout);
+    }
 
     //! \name construction and destruction
     //! moving is allowed; copying is disallowed; default construction not possible
