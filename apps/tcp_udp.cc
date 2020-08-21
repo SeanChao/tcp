@@ -96,10 +96,10 @@ static tuple<TCPConfig, FdAdapterConfig, bool> get_config(int argc, char **argv)
 
     if (listen) {
         c_filt.source = {"0", argv[argc - 1]};
-        spdlog::set_default_logger(spdlog::basic_logger_mt("server" + rand_string(3), "/tmp/tcplab_udp_server.log"));
+        // spdlog::set_default_logger(spdlog::basic_logger_mt("server" + rand_string(3), "/tmp/tcplab_server.log"));
     } else {
         c_filt.destination = {argv[argc - 2], argv[argc - 1]};
-        spdlog::set_default_logger(spdlog::basic_logger_mt("client" + rand_string(3), "/tmp/tcplab_udp_client.log"));
+        // spdlog::set_default_logger(spdlog::basic_logger_mt("client" + rand_string(3), "/tmp/tcplab_client.log"));
     }
 
     return make_tuple(c_fsm, c_filt, listen);

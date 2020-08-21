@@ -1,5 +1,5 @@
 #include "tcp_connection.hh"
-// #include "spdlog/spdlog.h"
+
 #include <iostream>
 
 // Dummy implementation of a TCP connection
@@ -18,10 +18,8 @@ size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_b
 size_t TCPConnection::time_since_last_segment_received() const { return timer.interval(); }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
-    spdlog::info("CC: <- 📦 " + seg.header().summary() + " len: " + to_string(seg.length_in_sequence_space()) +
-                 " data: " + seg.payload().copy().substr(0, 40));
-    // cout << "CC: <- 📦 " << seg.header().summary() << " len: " << seg.length_in_sequence_space()
-    //  << " data: " << seg.payload().copy().substr(0, 40) << endl;
+    // spdlog::info("CC: <- 📦 " + seg.header().summary() + " len: " + to_string(seg.length_in_sequence_space()) +
+    //              " data: " + seg.payload().copy().substr(0, 40));
     timer.mark();
     conn_end_detect();
     if (!_active)
@@ -29,15 +27,13 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     // LISTEN mode, ignore all RST
     if (!state_connect && seg.header().rst)
         return;
-    // LISTEN mode, not SYN yet, any ACK should result in RST
-    // ignore (relaxed)
+    // LISTEN mode, not SYN yet, any ACK should result in RST or be ignored (relaxed)
     if (!state_connect && listen_wait_syn && !seg.header().syn) {
-        // send_rst();
         return;
     }
     bool in_win = _receiver.segment_received(seg);
     if (!in_win) {
-        spdlog::info("RX: Rejected an inbound segment");
+        // spdlog::info("RX: Rejected an inbound segment");
         // No ack to out-of-window RST
         if (seg.header().rst) {
             if (seg.header().ack && seg.header().ackno == seg.header().seqno + 1) {
@@ -50,7 +46,6 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         if (!_receiver.ackno().has_value()) {
             // Good ACK, ignore
             if (seg.header().ack && seg.header().ackno != seg.header().seqno + 1)
-                // send_rst(seg.header().ackno);
                 return;
         }
         _sender.send_empty_segment();
@@ -58,46 +53,34 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         return;
     }
     bool send_ack = false;
-    if (seg.length_in_sequence_space() > 0)
-        send_ack = true;
+    send_ack |= seg.length_in_sequence_space() > 0;
     if (seg.header().ack) {
         bool s_valid = _sender.ack_received(seg.header().ackno, seg.header().win);
-        if (!s_valid)
-            send_ack = true;
+        send_ack |= !s_valid;
     } else if (seg.header().syn) {
-        if (!state_connect)
-            listen_wait_syn = false;
+        listen_wait_syn = state_connect;
         _sender.fill_window();
         send_ack = false;  // No need to manually create a segment
     }
-    if (seg.header().syn) {
-        if (state_connect)
-            send_ack = true;
-        // _sender.send_empty_segment();
-    }
+    send_ack |= seg.header().syn && state_connect;
     if (seg.header().rst) {
         _receiver.stream_out().set_error();
         _sender.stream_in().set_error();
         _active = false;
     }
     // ack incoming ack with fin
-    if (seg.header().fin && seg.header().ack) {
-        send_ack = true;
-        // _sender.send_empty_segment();
-    }
+    send_ack |= seg.header().fin && seg.header().ack;
 
     if (send_ack)
         _sender.send_empty_segment();
     this->send_out();
 }
 
-bool TCPConnection::active() const {
-    // conn_end_detect();
-    // spdlog::info("active: {}", _active);
-    return _active;
-}
+bool TCPConnection::active() const { return _active; }
 
 size_t TCPConnection::write(const string &data) {
+    if(data.size() == 0)
+        return 0;
     size_t size = _sender.stream_in().write(data);
     _sender.fill_window();
     this->send_out();
@@ -108,8 +91,9 @@ size_t TCPConnection::write(const string &data) {
 void TCPConnection::tick(const size_t ms_since_last_tick) {
     timer.update(ms_since_last_tick);
     _sender.tick(ms_since_last_tick);
+    // uint64_t linger_time = timer.interval();
     if (ms_since_last_tick != 0) {
-        spdlog::info("CC: ⌛ " + to_string(ms_since_last_tick) + "ms");
+        // spdlog::info("CC: ⌛ " + to_string(ms_since_last_tick) + "ms");
         conn_end_detect();
     }
     // If the stream is ongoing
@@ -121,7 +105,7 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
 
 void TCPConnection::end_input_stream() {
     conn_end_detect();
-    spdlog::info("CC: sender input stream end");
+    // spdlog::info("CC: sender input stream end");
     _sender.stream_in().end_input();
     _sender.fill_window();
     this->send_out();
@@ -129,7 +113,8 @@ void TCPConnection::end_input_stream() {
 
 // Connect to a remote server
 void TCPConnection::connect() {
-    spdlog::info("🎉 Connect");
+    // cout << "Hi~~~" << endl;
+    // spdlog::info("🎉 Connect");
     this->state_connect = true;
     _sender.fill_window();
     this->send_out();
@@ -140,7 +125,15 @@ TCPConnection::~TCPConnection() {
         if (active()) {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
             // need to send a RST segment to the peer
-            spdlog::info("CC: deconstructor called while the connection is active");
+            // spdlog::info("CC: conditions[s_stream_end={}, eof={}, r_stream_end={}, fin_sent={}, bytes_in_flight={}] "
+            //              "rx_stream: {} tx_stream: {}",
+            //              _sender.stream_in().input_ended(),
+            //              _sender.stream_in().eof(),
+            //              _receiver.stream_out().eof(),
+            //              fin_sent,
+            //              bytes_in_flight(),
+            //              _receiver.stream_out().summary(),
+            //              _sender.stream_in().summary());
             send_rst();
         }
     } catch (const exception &e) {
@@ -164,7 +157,7 @@ void TCPConnection::send_out() {
             fin_sent = true;
         seg.header().win = _receiver.window_size();
         _segments_out.push(seg);
-        spdlog::info("CC: -> 📦 " + seg.header().summary() + " len: {}", seg.length_in_sequence_space());
+        // spdlog::info("CC: -> 📦 " + seg.header().summary() + " len: {}", seg.length_in_sequence_space());
         sender_seg_out.pop();
     }
 }
@@ -186,25 +179,25 @@ void TCPConnection::send_rst(optional<WrappingInt32> seqno) {
     if (seqno)
         top.header().seqno = seqno.value();
     _segments_out.push(top);
-    spdlog::info("CC: send RST " + top.header().summary());
+    // spdlog::info("CC: send RST " + top.header().summary());
     // set streams to error
     reset();
     _linger_after_streams_finish = false;
-    spdlog::info("❌ Connection reset.");
+    // spdlog::info("❌ Connection reset.");
 }
 
 bool TCPConnection::conn_end_detect() {
     if (!_active)
         return true;
     if (_sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
-        spdlog::info("CC: 🤦‍♂️ reset due to too many retransmissions.");
+        // spdlog::info("CC: 🤦‍♂️ reset due to too many retransmissions.");
         send_rst(_sender.next_seqno() - _sender.bytes_in_flight());
         return true;
     }
     // Passive close: The remote peers ends first
     if (_receiver.stream_out().input_ended() && !_sender.stream_in().eof() && _linger_after_streams_finish) {
         _linger_after_streams_finish = false;
-        spdlog::info("CC: (Passive Close Enabled)");
+        // spdlog::info("CC: (Passive Close Enabled)");
     }
     // bytes_in_flight == 0 implies fin acked
     bool fin = _sender.stream_in().input_ended() && _sender.stream_in().eof() && _receiver.stream_out().eof() &&
@@ -214,24 +207,24 @@ bool TCPConnection::conn_end_detect() {
             uint64_t linger_time = timer.interval();
             if (linger_time >= 10 * _cfg.rt_timeout) {
                 _active = false;
-                spdlog::info("👋 Connection closed. (Timeout)");
+                // spdlog::info("👋 Connection closed. (Timeout)");
             }
         } else {
             // connection is done
             _active = false;
-            spdlog::info("👋 Connection closed.");
+            // spdlog::info("👋 Connection closed.");
         }
     }
-    spdlog::info("CC: fin={}, conditions[s_stream_end={}, eof={}, r_stream_end={}, fin_sent={}, bytes_in_flight={}] "
-                 "rx_stream: {} tx_stream: {}",
-                 fin,
-                 _sender.stream_in().input_ended(),
-                 _sender.stream_in().eof(),
-                 _receiver.stream_out().eof(),
-                 fin_sent,
-                 bytes_in_flight(),
-                 _receiver.stream_out().summary(),
-                 _sender.stream_in().summary());
+    // spdlog::info("CC: fin={}, conditions[s_stream_end={}, eof={}, r_stream_end={}, fin_sent={}, bytes_in_flight={}] "
+    //              "rx_stream: {} tx_stream: {}",
+    //  fin,
+    //  _sender.stream_in().input_ended(),
+    //  _sender.stream_in().eof(),
+    //  _receiver.stream_out().eof(),
+    //  fin_sent,
+    //  bytes_in_flight(),
+    //  _receiver.stream_out().summary(),
+    //  _sender.stream_in().summary());
     return fin;
 }
 

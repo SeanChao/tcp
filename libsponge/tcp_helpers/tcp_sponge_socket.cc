@@ -221,7 +221,7 @@ void TCPSpongeSocket<AdaptT>::connect(const TCPConfig &c_tcp, const FdAdapterCon
     }
 
     _tcp_loop([&] { return _tcp->state() == TCPState::State::SYN_SENT; });
-    cerr << "done.\n";
+    cerr << "Connected.\n";
 
     _tcp_thread = thread(&TCPSpongeSocket::_tcp_main, this);
 }
@@ -288,6 +288,7 @@ void CS144TCPSocket::connect(const Address &address) {
 
     FdAdapterConfig multiplexer_config;
     multiplexer_config.source = {"169.254.144.9", to_string(uint16_t(random_device()()))};
+    // multiplexer_config.source = {"127.0.0.1", to_string(uint16_t(random_device()()))};
     multiplexer_config.destination = address;
 
     TCPOverIPv4SpongeSocket::connect(tcp_config, multiplexer_config);

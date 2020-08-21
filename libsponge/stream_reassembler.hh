@@ -17,6 +17,7 @@ class StreamReassembler {
         bool _eof;
         segment(std::string data, uint64_t index, bool eof) : _data(data), _index(index), _eof(eof) {}
         bool operator<(const segment &seg) const { return this->_index < seg._index; }
+        bool operator<(const segment *seg) const { return this->_index < seg->_index; }
         uint64_t get_start() const { return _index; }
         uint64_t get_end() const { return _index + _data.length(); }
         uint64_t get_len() const { return _data.length(); }
@@ -26,10 +27,14 @@ class StreamReassembler {
         }
     };
 
+    struct seg_comp {
+        bool operator()(segment *s1, segment *s2) const { return s1->_index < s2->_index; }
+    };
+
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
     uint64_t _next_index;
-    std::multiset<segment> _unassembled_seg;
+    std::multiset<segment *, seg_comp> _unassembled_seg;
     size_t _unassembled_bytes;
 
   public:

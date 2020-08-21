@@ -126,11 +126,11 @@ static tuple<TCPConfig, FdAdapterConfig, bool, char *> get_config(int argc, char
             show_usage(argv[0], "ERROR: listen port cannot be zero in server mode.");
             exit(1);
         }
-        spdlog::set_default_logger(spdlog::basic_logger_mt("server" + rand_string(3), "/tmp/tcplab_server.log"));
+        // spdlog::set_default_logger(spdlog::basic_logger_mt("server" + rand_string(3), "/tmp/tcplab_server.log"));
     } else {
         c_filt.destination = {argv[curr], argv[curr + 1]};
         c_filt.source = {source_address, source_port};
-        spdlog::set_default_logger(spdlog::basic_logger_mt("client" + rand_string(3), "/tmp/tcplab_client.log"));
+        // spdlog::set_default_logger(spdlog::basic_logger_mt("client" + rand_string(3), "/tmp/tcplab_client.log"));
     }
 
     return make_tuple(c_fsm, c_filt, listen, tundev);

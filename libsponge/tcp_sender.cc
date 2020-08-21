@@ -35,18 +35,20 @@ void TCPSender::fill_window() {
     size_t adjusted_win = (_window_size > 0 ? _window_size : 1);
     size_t size_under_window = adjusted_win - bytes_in_flight();
     bool keep = true;
-    while (keep && /*size_under_window > 0 &&*/ !_stream.error()) {
+    while (keep && !_stream.error()) {
         TCPSegment seg;
         TCPHeader header;
 
         if (adjusted_win <= bytes_in_flight())
             break;
         size_under_window = adjusted_win - bytes_in_flight();
+        if(size_under_window  == 0)
+            break;
         size_t size = size_under_window < TCPConfig::MAX_PAYLOAD_SIZE ? size_under_window : TCPConfig::MAX_PAYLOAD_SIZE;
         if (_next_seqno == 0)
             header.syn = true;
-        spdlog::warn(
-            "TX: fill_window input_end={} buf_size={} size={}", _stream.input_ended(), _stream.buffer_size(), size);
+        // spdlog::warn(
+        //     "TX: fill_window input_end={} buf_size={} size={}", _stream.input_ended(), _stream.buffer_size(), size);
         if (_stream.input_ended() && _stream.buffer_size() + header.syn + 1 <= size) {
             header.fin = true;
             this->fin = true;
@@ -99,8 +101,7 @@ bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
         if (_unwrap(seg.header().seqno) + seg.length_in_sequence_space() <= u_ackno) {
             _outstanding.pop();
             // cout << "TX: bytes in flight " << _bytes_in_flight << " reduce by " << seg.length_in_sequence_space() <<
-            // " "
-            //  << seg.header().summary() << " " << seg.payload().copy().substr(0, 40) << endl;
+            // " " << seg.header().summary() << " " << seg.payload().copy().substr(0, 40) << endl;
             _bytes_in_flight -= seg.length_in_sequence_space();
         } else
             break;
@@ -111,7 +112,7 @@ bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     // When all outstanding data has been acknowledged, turn off the retransmission timer.
     if (_outstanding.empty())
         timer.stop();
-    spdlog::info("TX: winsize->{} bytes_in_flight={}", _window_size, bytes_in_flight());
+    // spdlog::info("TX: winsize->{} bytes_in_flight={}", _window_size, bytes_in_flight());
     return true;
 }
 
@@ -148,7 +149,7 @@ void TCPSender::send_segment(TCPSegment &segment) {
     stringstream ss;
     ss << "TX: -> 📦 " << segment.header().summary() << " len: " << segment.length_in_sequence_space()
        << " payload: " << segment.payload().copy().substr(0, 40) << endl;
-    spdlog::info(ss.str());
+    // spdlog::info(ss.str());
 }
 
 uint64_t TCPSender::_unwrap(WrappingInt32 n) const { return unwrap(n, _isn, _checkpoint); }
@@ -159,7 +160,7 @@ void TCPSender::send_empty_segment() {
     _segments_out.push(seg);
     stringstream ss;
     ss << "TX: -> empty 📦 " << seg.header().summary() << endl;
-    spdlog::info(ss.str());
+    // spdlog::info(ss.str());
 }
 
 void Timer::start() { running = true; }

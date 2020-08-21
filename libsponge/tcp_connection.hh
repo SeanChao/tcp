@@ -1,8 +1,8 @@
 #ifndef SPONGE_LIBSPONGE_TCP_FACTORED_HH
 #define SPONGE_LIBSPONGE_TCP_FACTORED_HH
 
-#include "spdlog/sinks/basic_file_sink.h"
-#include "spdlog/spdlog.h"
+// #include <spdlog/sinks/basic_file_sink.h>
+// #include <spdlog/spdlog.h>
 #include "tcp_config.hh"
 #include "tcp_receiver.hh"
 #include "tcp_sender.hh"
@@ -112,9 +112,10 @@ class TCPConnection {
     //! Construct a new connection from a configuration
     explicit TCPConnection(const TCPConfig &cfg) : _cfg{cfg}, timer() {
         timer.start();
-        spdlog::set_pattern("[%H:%M:%S %e][%L] %v");
-        spdlog::set_default_logger(spdlog::basic_logger_mt("logger" + rand_string(3), "/dev/null"));
-        spdlog::info("Connection created: rt_timeout={}", cfg.rt_timeout);
+        // spdlog::set_level(spdlog::level::off);
+        // spdlog::set_pattern("[%H:%M:%S %e][%L] %v");
+        // spdlog::set_default_logger(spdlog::basic_logger_mt("logger" + rand_string(3), "/dev/null"));
+        // spdlog::info("Connection created: rt_timeout={}", cfg.rt_timeout);
     }
 
     //! \name construction and destruction

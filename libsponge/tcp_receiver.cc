@@ -12,7 +12,7 @@
 using namespace std;
 
 bool TCPReceiver::segment_received(const TCPSegment &seg) {
-    spdlog::info("RX: <- 📦 " + seg.header().summary());
+    // spdlog::info("RX: <- 📦 " + seg.header().summary());
     // Set the Initial Sequence Number if necessary.
     // The sequence number of the first arriving segment that has the SYN flag set is the initial sequence number.
     // You’ll want to keep track of that in order to keep converting between 32-bit wrapped seqnos/acknos and their
@@ -47,7 +47,7 @@ bool TCPReceiver::segment_received(const TCPSegment &seg) {
     uint64_t right = left + (winsize > 0 ? winsize - 1 : 0);
     uint64_t seg_left = unwrap(seqno, this->__isn.value(), this->checkpoint);
     uint64_t seg_right = seg_left + (seg_len > 0 ? seg_len - 1 : 0);
-    spdlog::info("RX: left: {} right: {}", left, right);
+    // spdlog::info("RX: left: {} right: {}", left, right);
     if (seg_right >= left && seg_left <= right) {
         // Push any data, or end-of-stream marker, to the StreamReassembler.
         // If the FIN flag is set in a TCPSegment’s header, that means that the stream ends with the last
@@ -68,7 +68,7 @@ bool TCPReceiver::segment_received(const TCPSegment &seg) {
     stringstream ss;
     ss << "RX: Reject an inbound segment [" << seg_left << ", " << seg_right << "] out of "
        << "[" << left << ", " << right << "]" << endl;
-    spdlog::info("RX: {}", ss.str());
+    // spdlog::info("RX: {}", ss.str());
     return false;
 }
 

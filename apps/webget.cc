@@ -1,16 +1,29 @@
 #include "eventloop.hh"
+#define LAB_IMPL _  // Comment to use kernal TCP
+#ifdef LAB_IMPL
+#include "tcp_sponge_socket.hh"
+#else
 #include "socket.hh"
+#endif
 #include "util.hh"
 
 #include <cstdlib>
 #include <iostream>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/spdlog.h>
 
 using namespace std;
 
 void get_URL(const string &host, const string &path) {
-    // connect to the "http" service on the computer whose name is in 
+    // connect to the "http" service on the computer whose name is in
     // the "host" string, then request the URL path given in the "path" string.
+#ifdef LAB_IMPL
+    CS144TCPSocket socket = CS144TCPSocket();
+#else
     TCPSocket socket = TCPSocket();
+#endif
+    cerr << "\033[;32mGET\033[;0m " << host << path << endl;
+
     socket.connect(Address(host, "http"));
     const std::string request = "GET " + path + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n";
     socket.write(request);
@@ -25,10 +38,16 @@ void get_URL(const string &host, const string &path) {
         cout << socket.read();
         i++;
     }
-    socket.close();
-
-    cerr << "Function called: get_URL(" << host << ", " << path << ").\n";
     cerr << "read " << i << " times.\n";
+
+#ifdef LAB_IMPL
+    // include fd close
+    socket.wait_until_closed();
+#else
+    socket.close();
+#endif
+
+    // spdlog::shutdown();
 }
 
 int main(int argc, char *argv[]) {
@@ -49,6 +68,10 @@ int main(int argc, char *argv[]) {
         // Get the command-line arguments.
         const string host = argv[1];
         const string path = argv[2];
+
+        // spdlog::set_default_logger(spdlog::basic_logger_mt("webget", "/tmp/tcplab.log"));
+        // spdlog::info("Hello!");
+        // spdlog::flush_every(std::chrono::seconds(1));
 
         // Call the student-written function.
         get_URL(host, path);

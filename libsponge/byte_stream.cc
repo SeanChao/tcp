@@ -16,7 +16,7 @@ using namespace std;
 ByteStream::ByteStream(const size_t cap)
     : capacity(cap)
     , buf_len(cap + 1)
-    , buffer(string(buf_len, 'x'))
+    , buffer(string(buf_len, 0))
     , start(0)
     , end(0)
     , inputEndFlag(false)
@@ -26,18 +26,18 @@ ByteStream::ByteStream(const size_t cap)
 size_t ByteStream::write(const string &data) {
     if (error())
         return 0;
-    size_t count = 0;
-    for (size_t i = 0; i < data.length(); i++) {
-        if (((end + 1) % buf_len) == start) {
-            // buffer is full
-            break;
-        }
-        end = (end + 1) % buf_len;
-        buffer[end] = data[i];
-        count++;
+    size_t rc = remaining_capacity();
+    size_t s_len = data.length();
+    size_t len = rc < s_len ? rc : s_len;
+    if (end + len >= buf_len) {
+        buffer.replace(end + 1, buf_len - end - 1, data, 0, buf_len - end - 1);
+        buffer.replace(0, len - buf_len + end + 1, data, buf_len - end - 1, len - buf_len + end + 1);
+    } else {
+        buffer.replace(end + 1, len, data, 0, len);
     }
-    this->write_cnt += count;
-    return count;
+    end = (end + len) < buf_len ? (end + len) : (end + len) % buf_len;
+    this->write_cnt += len;
+    return len;
 }
 
 //! \param[in] len bytes will be copied from the output side of the buffer
@@ -45,32 +45,45 @@ string ByteStream::peek_output(const size_t len) const {
     if (error() || eof()) {
         return "";
     }
-    size_t pos = (start + 1) % buf_len;
-    size_t cnt = 0;
+    size_t buf_size = buffer_size();
+    size_t max_size = len < buf_size ? len : buf_size;
     std::string peek = "";
-    while (pos != ((end + 1) % buf_len) && cnt < len) {
-        peek.push_back(buffer[pos]);
-        pos = (pos + 1) % buf_len;
-        cnt++;
+    if (start + max_size >= buf_len) {
+        peek.append(buffer.substr(start + 1));
+        peek.append(buffer.substr(0, max_size - buf_len + start + 1));
+    } else {
+        peek.append(buffer.substr(start + 1, max_size));
     }
     return peek;
 }
 
 //! \param[in] len bytes will be removed from the output side of the buffer
 void ByteStream::pop_output(const size_t len) {
-    size_t size = len;
-    while (size > 0 && start != end) {
-        start = (start + 1) % buf_len;
-        size--;
+    if (error() || eof()) {
+        return;
     }
-    this->read_cnt += len;
+    size_t buf_size = buffer_size();
+    size_t max_size = len < buf_size ? len : buf_size;
+    start = (start + max_size) < buf_len ? (start + max_size) : (start + max_size) % buf_len;
+    this->read_cnt += max_size;
 }
 
 std::string ByteStream::read(const size_t len) {
-    auto ret = peek_output(len);
-    size_t read_len = ret.length();
-    pop_output(read_len);
-    return ret;
+    if (error() || eof()) {
+        return "";
+    }
+    size_t buf_size = buffer_size();
+    size_t max_size = len < buf_size ? len : buf_size;
+    std::string peek = "";
+    if (start + max_size >= buf_len) {
+        peek.append(buffer.substr(start + 1));
+        peek.append(buffer.substr(0, max_size - buf_len + start + 1));
+    } else {
+        peek.append(buffer.substr(start + 1, max_size));
+    }
+    start = (start + max_size) < buf_len ? (start + max_size) : (start + max_size) % buf_len;
+    this->read_cnt += max_size;
+    return peek;
 }
 
 void ByteStream::end_input() { this->inputEndFlag = true; }
