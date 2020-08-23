@@ -143,7 +143,7 @@ void NetworkInterface::insert_arp(uint32_t ip_addr, EthernetAddress eth_addr) {
     arp.eth = eth_addr;
     arp.time = _timer.time;
     _arp_table.insert_or_assign(ip_addr, arp);
-    cout << "APR: + " << inet_ntoa({htobe32(ip_addr)}) << " -> " << to_string(arp.eth) << endl;
+    // cout << "APR: + " << inet_ntoa({htobe32(ip_addr)}) << " -> " << to_string(arp.eth) << endl;
 }
 
 void NetworkInterface::send_frames() {
