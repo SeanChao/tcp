@@ -8,9 +8,9 @@ For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.ed
 
 To set up your build directory:
 
-	$ mkdir -p <path/to/sponge>/build
-	$ cd <path/to/sponge>/build
-	$ cmake ..
+    $ mkdir -p <path/to/sponge>/build
+    $ cd <path/to/sponge>/build
+    $ cmake ..
 
 **Note:** all further commands listed below should be run from the `build` dir.
 
@@ -83,3 +83,19 @@ To format (you'll need `clang-format`):
 To see all available targets,
 
     $ make help
+
+## Configuration
+
+Tests associating with full `TCPConnection` and `NetworkInterface` would require some NAT rules in `iptables`, as scripted in `tap.sh` and `tun.sh`.
+Beforing running these tests, make sure that the original iptable rules will not conflict with rules added by these scripts.
+After running the scripts, make sure that the rules are effective and makes sense. For example, the NAT rule should produce a proper IP address for your TCPSegments so that other hosts can reach you.
+Otherwise, you won't get any response even if your implementation is correct.
+
+I modified these scripts with simple rules below to make NAT work in WSL:
+
+```sh
+# tap.sh
+HOST=172.233.233.233 # ip address that makes sense
+iptables -t nat -A PREROUTING -s ${HOST} -j DNAT --to-destination ${TUN_IP_PREFIX}.${TAPNUM}.9
+iptables -t nat -A POSTROUTING -s ${TUN_IP_PREFIX}.${1}.0/24 -j SNAT --to-source ${HOST}
+```

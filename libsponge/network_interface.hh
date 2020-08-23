@@ -3,8 +3,10 @@
 
 #include "ethernet_frame.hh"
 #include "tcp_over_ip.hh"
+#include "tcp_sender.hh"  // for the timer
 #include "tun.hh"
 
+#include <map>
 #include <optional>
 #include <queue>
 
@@ -39,6 +41,37 @@ class NetworkInterface {
 
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
+
+    struct arp_entry {
+        EthernetAddress eth;
+        uint64_t time;  // time when inserted
+    };
+
+    struct arp_query {
+        uint32_t ip;
+        uint64_t time;
+    };
+
+    std::map<uint32_t, arp_entry> _arp_table{};
+
+    std::map<uint32_t, size_t> _arp_query_time{};
+
+    typedef struct _pending_dgram {
+        InternetDatagram dgram;
+        uint32_t next_hop_ip;
+    } pending_dgram;
+
+    std::queue<pending_dgram> _waiting_datagram{};
+
+    Timer _timer{};
+
+    static constexpr uint64_t ARP_EXPIRE = 30000;
+    static constexpr uint64_t ARP_INTERVAL = 5000;
+
+    std::optional<EthernetAddress> get_arp(uint32_t ip_addr);
+    void insert_arp(uint32_t ip_addr, EthernetAddress eth_addr);
+
+    void send_frames();
 
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses

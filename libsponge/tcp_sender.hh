@@ -11,6 +11,8 @@
 
 class Timer {
   public:
+    size_t time = 0;
+
     void start();
     void stop();
     void update(size_t ms_since_last_tick);
@@ -26,7 +28,6 @@ class Timer {
 
   private:
     bool running = false;
-    size_t time = 0;
     size_t rto = 0;
     size_t _mark = 0;
 };

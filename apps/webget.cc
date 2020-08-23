@@ -18,7 +18,7 @@ void get_URL(const string &host, const string &path) {
     // connect to the "http" service on the computer whose name is in
     // the "host" string, then request the URL path given in the "path" string.
 #ifdef LAB_IMPL
-    CS144TCPSocket socket = CS144TCPSocket();
+    FullStackSocket socket = FullStackSocket();
 #else
     TCPSocket socket = TCPSocket();
 #endif
